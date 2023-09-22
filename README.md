@@ -1,2 +1,5 @@
 # gltfviewer
-A simple desktop app for viewing glTF file
+A simple desktop app for viewing glTF file (written in zig)
+
+## screenshot
+<a href="."><img src="screenshot.png" alt="screenshot" height="200"></a>
