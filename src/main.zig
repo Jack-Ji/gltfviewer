@@ -25,18 +25,19 @@ fn openModel(ctx: jok.Context) !void {
     defer loading_model.store(false, .Monotonic);
 
     if (try nfd.openFileDialog("glb,gltf", null)) |path| {
-        if (model_path) |p| {
-            p.deinit();
-            mesh.destroy();
-        }
-
-        model_path = path;
-        mesh = try j3d.Mesh.fromGltf(
+        const m = try j3d.Mesh.fromGltf(
             ctx.allocator(),
             ctx.renderer(),
             path.path,
             .{},
         );
+
+        if (model_path) |p| {
+            p.deinit();
+            mesh.destroy();
+        }
+        model_path = path;
+        mesh = m;
     }
 }
 
