@@ -20,6 +20,7 @@ var model_path: ?nfd.FilePath = null;
 var mesh: *j3d.Mesh = undefined;
 var loading_model = std.atomic.Atomic(bool).init(false);
 var axis_tex: sdl.Texture = undefined;
+var wireframe: bool = false;
 
 fn openModel(ctx: jok.Context) !void {
     defer loading_model.store(false, .Monotonic);
@@ -42,7 +43,7 @@ fn openModel(ctx: jok.Context) !void {
 }
 
 pub fn init(ctx: jok.Context) !void {
-    try ctx.renderer().setColorRGB(166, 205, 231);
+    try ctx.renderer().setColorRGB(100, 100, 100);
 
     axis_camera = j3d.Camera.fromPositionAndTarget(
         .{
@@ -116,6 +117,8 @@ pub fn update(ctx: jok.Context) !void {
                     comptime "{s}",
                     .{p.path},
                 );
+
+                _ = imgui.checkbox("wireframe", .{ .v = &wireframe });
             }
         }
         imgui.end();
@@ -144,7 +147,10 @@ pub fn draw(ctx: jok.Context) !void {
 
     if (loading_model.load(.Monotonic) or model_path == null) return;
 
-    try j3d.begin(.{ .camera = model_camera });
+    try j3d.begin(.{
+        .camera = model_camera,
+        .wireframe_color = if (wireframe) sdl.Color.green else null,
+    });
     try j3d.mesh(
         mesh,
         zmath.identity(),
