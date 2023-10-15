@@ -26,6 +26,12 @@ fn openModel(ctx: jok.Context) !void {
     defer loading_model.store(false, .Monotonic);
 
     if (try nfd.openFileDialog("glb,gltf", null)) |path| {
+        errdefer sdl.showSimpleMessageBox(
+            .{ .@"error" = true },
+            "ERROR",
+            "Unable to open model file, wrong format?",
+            null,
+        ) catch unreachable;
         const m = try j3d.Mesh.fromGltf(
             ctx.allocator(),
             ctx.renderer(),
