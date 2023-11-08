@@ -62,7 +62,6 @@ pub fn init(ctx: jok.Context) !void {
         },
         [_]f32{ 5, 5, 5 },
         [_]f32{ 0, 0, 0 },
-        null,
     );
     model_camera = axis_camera;
 
@@ -156,6 +155,7 @@ pub fn draw(ctx: jok.Context) !void {
     try j3d.begin(.{
         .camera = model_camera,
         .wireframe_color = if (wireframe) sdl.Color.green else null,
+        .triangle_sort = .simple,
     });
     try j3d.mesh(
         mesh,
