@@ -21,6 +21,7 @@ var mesh: *j3d.Mesh = undefined;
 var loading_model = std.atomic.Atomic(bool).init(false);
 var axis_tex: sdl.Texture = undefined;
 var wireframe: bool = false;
+var gouraud_shading: bool = false;
 
 fn openModel(ctx: jok.Context) !void {
     defer loading_model.store(false, .Monotonic);
@@ -124,6 +125,7 @@ pub fn update(ctx: jok.Context) !void {
                 );
 
                 _ = imgui.checkbox("wireframe", .{ .v = &wireframe });
+                _ = imgui.checkbox("gouraud shading", .{ .v = &gouraud_shading });
             }
         }
         imgui.end();
@@ -160,7 +162,10 @@ pub fn draw(ctx: jok.Context) !void {
     try j3d.mesh(
         mesh,
         zmath.identity(),
-        .{ .lighting = .{} },
+        .{
+            .lighting = .{},
+            .shading_method = if (gouraud_shading) .gouraud else .flat,
+        },
     );
     try j3d.end();
 }
