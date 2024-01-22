@@ -18,13 +18,13 @@ var axis_camera: j3d.Camera = undefined;
 var model_camera: j3d.Camera = undefined;
 var model_path: ?nfd.FilePath = null;
 var mesh: *j3d.Mesh = undefined;
-var loading_model = std.atomic.Atomic(bool).init(false);
+var loading_model = std.atomic.Value(bool).init(false);
 var axis_tex: sdl.Texture = undefined;
 var wireframe: bool = false;
 var gouraud_shading: bool = false;
 
 fn openModel(ctx: jok.Context) !void {
-    defer loading_model.store(false, .Monotonic);
+    defer loading_model.store(false, .Release);
 
     if (try nfd.openFileDialog("glb,gltf", null)) |path| {
         errdefer sdl.showSimpleMessageBox(
@@ -68,7 +68,9 @@ pub fn init(ctx: jok.Context) !void {
 
     axis_tex = try jok.utils.gfx.createTextureAsTarget(
         ctx.renderer(),
-        .{ .x = 200, .y = 200 },
+        .{
+            .size = .{ .x = 200, .y = 200 },
+        },
     );
 }
 
@@ -102,7 +104,11 @@ pub fn event(ctx: jok.Context, e: sdl.Event) !void {
 }
 
 pub fn update(ctx: jok.Context) !void {
-    imgui.beginDisabled(.{ .disabled = loading_model.loadUnchecked() });
+    _ = ctx;
+}
+
+pub fn draw(ctx: jok.Context) !void {
+    imgui.beginDisabled(.{ .disabled = loading_model.load(.Acquire) });
     {
         if (imgui.begin("Browser", .{
             .flags = .{ .always_auto_resize = true },
@@ -131,15 +137,39 @@ pub fn update(ctx: jok.Context) !void {
         imgui.end();
     }
     imgui.endDisabled();
-}
 
-pub fn draw(ctx: jok.Context) !void {
-    try ctx.renderer().setTarget(axis_tex);
+    _ = try jok.utils.gfx.renderToTexture(
+        ctx.renderer(),
+        struct {
+            pub fn draw(_: @This(), _: sdl.Renderer, _: sdl.PointF) !void {
+                try j3d.begin(.{ .camera = axis_camera });
+                try j3d.axises(.{ .radius = 0.1, .length = 3 });
+                try j3d.end();
+            }
+        }{},
+        .{
+            .target = axis_tex,
+            .clear_color = sdl.Color.rgba(255, 0, 0, 0),
+        },
+    );
+
     try ctx.renderer().clear();
-    try j3d.begin(.{ .camera = axis_camera });
-    try j3d.axises(.{ .radius = 0.1, .length = 3 });
-    try j3d.end();
-    try ctx.renderer().setTarget(null);
+    if (!loading_model.load(.Acquire) and model_path != null) {
+        try j3d.begin(.{
+            .camera = model_camera,
+            .wireframe_color = if (wireframe) sdl.Color.green else null,
+            .triangle_sort = .simple,
+        });
+        try j3d.mesh(
+            mesh,
+            zmath.identity(),
+            .{
+                .lighting = .{},
+                .shading_method = if (gouraud_shading) .gouraud else .flat,
+            },
+        );
+        try j3d.end();
+    }
 
     var axis_pos = ctx.getFramebufferSize();
     axis_pos.x -= 200;
@@ -152,22 +182,7 @@ pub fn draw(ctx: jok.Context) !void {
     );
     try j2d.end();
 
-    if (loading_model.load(.Monotonic) or model_path == null) return;
-
-    try j3d.begin(.{
-        .camera = model_camera,
-        .wireframe_color = if (wireframe) sdl.Color.green else null,
-        .triangle_sort = .simple,
-    });
-    try j3d.mesh(
-        mesh,
-        zmath.identity(),
-        .{
-            .lighting = .{},
-            .shading_method = if (gouraud_shading) .gouraud else .flat,
-        },
-    );
-    try j3d.end();
+    ctx.displayStats(.{ .collapsible = true });
 }
 
 pub fn quit(ctx: jok.Context) void {
