@@ -162,7 +162,7 @@ pub fn draw(ctx: jok.Context) !void {
         });
         try j3d.mesh(
             mesh,
-            zmath.identity(),
+            zmath.translation(0.0, -1.0, 0.0),
             .{
                 .lighting = .{},
                 .shading_method = if (gouraud_shading) .gouraud else .flat,
