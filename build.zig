@@ -1,5 +1,5 @@
 const std = @import("std");
-const jok = @import("lib/jok/build.zig");
+const jok = @import("jok");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
