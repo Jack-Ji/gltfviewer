@@ -57,6 +57,7 @@ dkms.conf
 # ziglang temp files
 zig-cache
 zig-out
+.zig-cache
 
 # sdl2 build config 
 .build_config

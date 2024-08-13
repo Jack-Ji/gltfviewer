@@ -16,8 +16,8 @@
     // internet connectivity.
     .dependencies = .{
         .jok = .{
-            .url = "53fc84c42d6258870609b501a172887eb51ecd7e.tar.gz",
-            .hash = "122019289358869be9e31e9df395b49ed5f848479c516a7965dcf01c26e3ecbfd6c2",
+            .url = "git+https://github.com/jack-ji/jok.git#090af78bf7b2eea5785246b6336ae9b78101a16d",
+            .hash = "12205c53a6aa9ff8586b5c4b73f978eb5be1a7918dfc3b4f80b4a17d5bbfc08a194c",
         },
     },
     .paths = .{
