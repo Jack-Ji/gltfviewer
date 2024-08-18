@@ -20,8 +20,13 @@ var model_path: ?nfd.FilePath = null;
 var mesh: *j3d.Mesh = undefined;
 var loading_model = std.atomic.Value(bool).init(false);
 var axis_tex: sdl.Texture = undefined;
+var scale: f32 = 1.0;
 var wireframe: bool = false;
 var gouraud_shading: bool = false;
+var animation: ?*j3d.Animation = null;
+var animation_names: std.ArrayList([:0]u8) = undefined;
+var animation_idx: i32 = -1;
+var animation_playtime: f32 = 0;
 
 fn openModel(ctx: jok.Context) !void {
     defer loading_model.store(false, .release);
@@ -42,9 +47,19 @@ fn openModel(ctx: jok.Context) !void {
         if (model_path) |p| {
             p.deinit();
             mesh.destroy();
+            if (animation) |a| a.destroy();
         }
         model_path = path;
         mesh = m;
+        animation = null;
+        for (animation_names.items) |n| ctx.allocator().free(n);
+        animation_names.clearRetainingCapacity();
+        var anim_it = m.animations.keyIterator();
+        while (anim_it.next()) |a| {
+            try animation_names.append(try std.fmt.allocPrintZ(ctx.allocator(), "{s}", .{a.*}));
+        }
+        animation_idx = -1;
+        animation_playtime = 0.0;
     }
 }
 
@@ -71,6 +86,8 @@ pub fn init(ctx: jok.Context) !void {
             .size = .{ .width = 200, .height = 200 },
         },
     );
+
+    animation_names = std.ArrayList([:0]u8).init(ctx.allocator());
 }
 
 pub fn event(ctx: jok.Context, e: sdl.Event) !void {
@@ -102,9 +119,7 @@ pub fn event(ctx: jok.Context, e: sdl.Event) !void {
     }
 }
 
-pub fn update(ctx: jok.Context) !void {
-    _ = ctx;
-}
+pub fn update(_: jok.Context) !void {}
 
 pub fn draw(ctx: jok.Context) !void {
     imgui.beginDisabled(.{ .disabled = loading_model.load(.acquire) });
@@ -129,8 +144,36 @@ pub fn draw(ctx: jok.Context) !void {
                     .{p.path},
                 );
 
+                _ = imgui.dragFloat("scale", .{
+                    .v = &scale,
+                    .speed = 0.01,
+                    .min = 0.01,
+                    .max = 100,
+                });
                 _ = imgui.checkbox("wireframe", .{ .v = &wireframe });
                 _ = imgui.checkbox("gouraud shading", .{ .v = &gouraud_shading });
+
+                if (imgui.beginCombo(
+                    "animations",
+                    .{
+                        .preview_value = if (animation_idx == -1)
+                            "none"
+                        else
+                            animation_names.items[@as(usize, @intCast(animation_idx))],
+                    },
+                )) {
+                    for (animation_names.items, 0..) |n, idx| {
+                        if (imgui.selectable(n, .{})) {
+                            animation_idx = @intCast(idx);
+                            if (animation) |a| a.destroy();
+                            animation = try j3d.Animation.create(
+                                ctx.allocator(),
+                                mesh.getAnimation(std.mem.sliceTo(n, 0)).?,
+                            );
+                        }
+                    }
+                    imgui.endCombo();
+                }
             }
         }
         imgui.end();
@@ -159,36 +202,59 @@ pub fn draw(ctx: jok.Context) !void {
             .wireframe_color = if (wireframe) sdl.Color.green else null,
             .triangle_sort = .simple,
         });
-        try j3d.mesh(
-            mesh,
+        defer j3d.end();
+
+        const mat = zmath.mul(
+            zmath.scalingV(zmath.f32x4s(scale)),
             zmath.translation(0.0, -1.0, 0.0),
-            .{
-                .lighting = .{},
-                .shading_method = if (gouraud_shading) .gouraud else .flat,
-            },
         );
-        j3d.end();
+        if (animation) |a| {
+            try j3d.animation(
+                a,
+                mat,
+                .{
+                    .lighting = .{},
+                    .shading_method = if (gouraud_shading) .gouraud else .flat,
+                    .playtime = animation_playtime,
+                },
+            );
+            animation_playtime += ctx.deltaSeconds();
+            if (animation_playtime > a.getDuration()) animation_playtime = 0.0;
+        } else {
+            try j3d.mesh(
+                mesh,
+                mat,
+                .{
+                    .lighting = .{},
+                    .shading_method = if (gouraud_shading) .gouraud else .flat,
+                },
+            );
+        }
     }
 
-    var axis_pos = ctx.getCanvasSize();
-    axis_pos.x -= 200;
-    axis_pos.y = 0;
-    j2d.begin(.{});
-    try j2d.image(
-        axis_tex,
-        axis_pos,
-        .{},
-    );
-    j2d.end();
+    {
+        j2d.begin(.{});
+        defer j2d.end();
+
+        var axis_pos = ctx.getCanvasSize();
+        axis_pos.x -= 200;
+        axis_pos.y = 0;
+        try j2d.image(
+            axis_tex,
+            axis_pos,
+            .{},
+        );
+    }
 
     ctx.displayStats(.{ .collapsible = true });
 }
 
 pub fn quit(ctx: jok.Context) void {
-    _ = ctx;
-
     if (model_path) |p| {
         p.deinit();
         mesh.destroy();
+        if (animation) |a| a.destroy();
+        for (animation_names.items) |n| ctx.allocator().free(n);
+        animation_names.deinit();
     }
 }
